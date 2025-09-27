@@ -1960,8 +1960,8 @@
         // ==================== الإعدادات الأساسية ====================
         
         // روابط Google Sheets
-        const GOOGLE_SHEETS_READ_URL = 'https://script.google.com/macros/s/AKfycbyea1g5kZPX43l1wgn6JaC9TVQnqyjhEUdA1Hpr6ev3WjW7300jplRq9I_66Ctaz8skeQ/exec';
-        const GOOGLE_SHEETS_WRITE_URL = 'https://script.google.com/macros/s/AKfycbyea1g5kZPX43l1wgn6JaC9TVQnqyjhEUdA1Hpr6ev3WjW7300jplRq9I_66Ctaz8skeQ/exec'; // استبدل بمعرف السكريبت الجديد
+        const GOOGLE_SHEETS_READ_URL = 'https://script.google.com/macros/s/AKfycbySI36AtywEM5zulL_lwwNGqPtAJc1aFHYjPj2T8InhH0QwlFVQFBa0j2h1ga5n2LExCw/exec';
+        const GOOGLE_SHEETS_WRITE_URL = 'https://script.google.com/macros/s/AKfycbySI36AtywEM5zulL_lwwNGqPtAJc1aFHYjPj2T8InhH0QwlFVQFBa0j2h1ga5n2LExCw/exec'; // استبدل بمعرف السكريبت الجديد
 
         // حالة التطبيق
         let products = [];
@@ -2061,61 +2061,53 @@
         }
 
         // إضافة منتج جديد إلى Google Sheets
-        async function addProductToGoogleSheets() {
-            const productData = {
-                name: document.getElementById('productName').value,
-                price: parseFloat(document.getElementById('productPrice').value),
-                originalprice: parseFloat(document.getElementById('productOriginalPrice').value) || 0,
-                category: document.getElementById('productCategory').value,
-                image: document.getElementById('productImage').value,
-                additionalImages: document.getElementById('productAdditionalImages').value,
-                colors: document.getElementById('productColors').value,
-                sizes: document.getElementById('productSizes').value,
-                description: document.getElementById('productDescription').value,
-                onsale: document.getElementById('productOnSale').checked,
-                soldout: document.getElementById('productSoldOut').checked
-            };
+  async function addProductToGoogleSheets() {
+  const productData = {
+    name: document.getElementById('productName').value.trim(),
+    price: parseFloat(document.getElementById('productPrice').value) || 0,
+    originalprice: parseFloat(document.getElementById('productOriginalPrice').value) || 0,
+    category: document.getElementById('productCategory').value,
+    image: document.getElementById('productImage').value.trim(),
+    additionalImages: document.getElementById('productAdditionalImages').value.trim(),
+    colors: document.getElementById('productColors').value.trim(),
+    sizes: document.getElementById('productSizes').value.trim(),
+    description: document.getElementById('productDescription').value.trim(),
+    onsale: document.getElementById('productOnSale').checked,
+    soldout: document.getElementById('productSoldOut').checked
+  };
 
-            // التحقق من البيانات
-            if (!productData.name || !productData.price || !productData.image || !productData.category) {
-                showNotification('Veuillez remplir tous les champs obligatoires (Nom, Prix, Image, Catégorie)', 'error');
-                return;
-            }
-
-            try {
-                showLoading('Ajout du produit en cours...');
-                
-                // إضافة محلياً للاختبار (استبدل هذا بالاتصال بالسكريبت الجديد)
-                const newProduct = {
-                    id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
-                    ...productData
-                };
-                
-                products.push(newProduct);
-                
-                // تحديث العرض
-                filterByCategory(currentCategory);
-                showNotification('Produit ajouté avec succès! ID: ' + newProduct.id, 'success');
-                
-                // إعادة تعيين النموذج
-                document.getElementById('productName').value = '';
-                document.getElementById('productPrice').value = '';
-                document.getElementById('productOriginalPrice').value = '';
-                document.getElementById('productImage').value = '';
-                document.getElementById('productAdditionalImages').value = '';
-                document.getElementById('productColors').value = '';
-                document.getElementById('productSizes').value = '';
-                document.getElementById('productDescription').value = '';
-                document.getElementById('productOnSale').checked = false;
-                document.getElementById('productSoldOut').checked = false;
-                
-            } catch (error) {
-                console.error('Erreur d\'ajout:', error);
-                showNotification('Erreur lors de l\'ajout du produit: ' + error.message, 'error');
-            } finally {
-                hideLoading();
-            }
-        }
+  try {
+    console.log("🚀 إرسال البيانات:", productData);
+    
+    // استخدام CORS Proxy
+    const PROXY_URL = 'https://cors-anywhere.herokuapp.com/';
+    const TARGET_URL = GOOGLE_SHEETS_WRITE_URL;
+    
+    const response = await fetch(PROXY_URL + TARGET_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(productData)
+    });
+    
+    const result = await response.json();
+    console.log("📩 response:", result);
+    
+    if (result.success) {
+      showNotification('✅ المنتج تمت إضافته بنجاح!', 'success');
+      // أعد تحميل المنتجات
+      loadProductsFromGoogleSheets();
+    } else {
+      showNotification('❌ فشل الإضافة: ' + result.message, 'error');
+    }
+    
+  } catch (error) {
+    console.error('❌ خطأ في الاتصال:', error);
+    showNotification('❌ خطأ في الاتصال: ' + error.message, 'error');
+  }
+}
 
         // ==================== نظام الإدارة ====================
 
