@@ -6,6 +6,7 @@
     <title>PRESTIGE FASHION NAWFAL - Mode Féminine Élégante</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+     
         :root {
             --primary-color: #1a1a1a;
             --secondary-color: #d4af37;
@@ -1552,6 +1553,7 @@
             }
         }
     </style>
+    
 </head>
 <body>
     <!-- نظام الدخول إلى الإدارة -->
@@ -1960,9 +1962,8 @@
         // ==================== الإعدادات الأساسية ====================
         
         // روابط Google Sheets
-        const GOOGLE_SHEETS_READ_URL = 'https://script.google.com/macros/s/AKfycbySI36AtywEM5zulL_lwwNGqPtAJc1aFHYjPj2T8InhH0QwlFVQFBa0j2h1ga5n2LExCw/exec';
-        const GOOGLE_SHEETS_WRITE_URL = 'https://script.google.com/macros/s/AKfycbySI36AtywEM5zulL_lwwNGqPtAJc1aFHYjPj2T8InhH0QwlFVQFBa0j2h1ga5n2LExCw/exec'; // استبدل بمعرف السكريبت الجديد
-
+        const GOOGLE_SHEETS_BASE_URL = 'https://script.google.com/macros/s/AKfycbxxsMgmhRiZ8YO77GMBQoTCT3r_gyIde7ZpjscfDKkRYhuNj_ggMocMRo8IxvPWLMhTPA/exec';
+        
         // حالة التطبيق
         let products = [];
         let cart = [];
@@ -1971,6 +1972,25 @@
         let currentProduct = null;
         let currentCategory = 'accueil';
         let filteredProducts = [];
+        
+        // ==================== إعدادات CORS Proxy ====================
+        const CORS_PROXIES = [
+            'https://corsproxy.io/?', 
+            'https://api.cors-anywhere.herokuapp.com/',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://api.allorigins.win/raw?url='
+        ];
+
+        let currentProxyIndex = 0;
+
+        function getProxyUrl(targetUrl) {
+            return CORS_PROXIES[currentProxyIndex] + encodeURIComponent(targetUrl);
+        }
+
+        function rotateProxy() {
+            currentProxyIndex = (currentProxyIndex + 1) % CORS_PROXIES.length;
+            console.log('تبديل إلى Proxy:', CORS_PROXIES[currentProxyIndex]);
+        }
 
         // ==================== دوال المساعدة ====================
 
@@ -2028,86 +2048,100 @@
         // تحميل المنتجات من Google Sheets
         async function loadProductsFromGoogleSheets() {
             try {
-                showLoading('Chargement des produits...');
+                showLoading('جاري تحميل المنتجات...');
                 
-                const response = await fetch(GOOGLE_SHEETS_READ_URL);
+                const response = await fetch(getProxyUrl(GOOGLE_SHEETS_BASE_URL));
                 
                 if (!response.ok) {
-                    throw new Error(`Erreur réseau: ${response.status}`);
+                    throw new Error(`خطأ HTTP! الحالة: ${response.status}`);
                 }
                 
                 const result = await response.json();
                 
                 if (result.success && Array.isArray(result.products)) {
                     products = result.products;
-                } else if (Array.isArray(result)) {
-                    products = result;
+                    filteredProducts = products;
+                    displayProducts();
+                    setupFilters();
+                    showNotification(`تم تحميل ${products.length} منتج بنجاح`, 'success');
                 } else {
-                    throw new Error('Structure de données inattendue');
+                    showNotification('خطأ في تنسيق البيانات المستلمة', 'error');
                 }
                 
-                setupFilters();
-                filterByCategory(currentCategory);
-                showNotification(`${products.length} produits chargés avec succès`, 'success');
-                
             } catch (error) {
-                console.error('Erreur de chargement:', error);
-                showNotification('Aucun produit trouvé dans la base de données', 'error');
-                products = [];
-                displayProducts();
+                console.error('Error loading products:', error);
+                showNotification('خطأ في تحميل المنتجات: ' + error.message, 'error');
+                rotateProxy(); // تبديل إلى Proxy آخر
             } finally {
                 hideLoading();
             }
         }
 
         // إضافة منتج جديد إلى Google Sheets
-  async function addProductToGoogleSheets() {
-  const productData = {
-    name: document.getElementById('productName').value.trim(),
-    price: parseFloat(document.getElementById('productPrice').value) || 0,
-    originalprice: parseFloat(document.getElementById('productOriginalPrice').value) || 0,
-    category: document.getElementById('productCategory').value,
-    image: document.getElementById('productImage').value.trim(),
-    additionalImages: document.getElementById('productAdditionalImages').value.trim(),
-    colors: document.getElementById('productColors').value.trim(),
-    sizes: document.getElementById('productSizes').value.trim(),
-    description: document.getElementById('productDescription').value.trim(),
-    onsale: document.getElementById('productOnSale').checked,
-    soldout: document.getElementById('productSoldOut').checked
-  };
+        async function addProductToGoogleSheets() {
+            const productData = {
+                name: document.getElementById('productName').value.trim(),
+                price: parseFloat(document.getElementById('productPrice').value) || 0,
+                originalprice: parseFloat(document.getElementById('productOriginalPrice').value) || 0,
+                category: document.getElementById('productCategory').value,
+                image: document.getElementById('productImage').value.trim(),
+                additionalImages: document.getElementById('productAdditionalImages').value.trim(),
+                colors: document.getElementById('productColors').value.trim(),
+                sizes: document.getElementById('productSizes').value.trim(),
+                description: document.getElementById('productDescription').value.trim(),
+                onsale: document.getElementById('productOnSale').checked,
+                soldout: document.getElementById('productSoldOut').checked
+            };
 
-  try {
-    console.log("🚀 إرسال البيانات:", productData);
-    
-    // استخدام CORS Proxy
-    const PROXY_URL = 'https://cors-anywhere.herokuapp.com/';
-    const TARGET_URL = GOOGLE_SHEETS_WRITE_URL;
-    
-    const response = await fetch(PROXY_URL + TARGET_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(productData)
-    });
-    
-    const result = await response.json();
-    console.log("📩 response:", result);
-    
-    if (result.success) {
-      showNotification('✅ المنتج تمت إضافته بنجاح!', 'success');
-      // أعد تحميل المنتجات
-      loadProductsFromGoogleSheets();
-    } else {
-      showNotification('❌ فشل الإضافة: ' + result.message, 'error');
-    }
-    
-  } catch (error) {
-    console.error('❌ خطأ في الاتصال:', error);
-    showNotification('❌ خطأ في الاتصال: ' + error.message, 'error');
-  }
-}
+            // التحقق من البيانات الأساسية
+            if (!productData.name || !productData.price || !productData.category) {
+                showNotification('❌ يرجى ملء الحقول الإلزامية: الاسم، السعر، والفئة', 'error');
+                return;
+            }
+
+            try {
+                console.log("🚀 إرسال البيانات:", productData);
+                
+                const response = await fetch(getProxyUrl(GOOGLE_SHEETS_BASE_URL), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(productData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`خطأ HTTP! الحالة: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                console.log("📩 response:", result);
+                
+                if (result.success) {
+                    showNotification('✅ المنتج تمت إضافته بنجاح إلى الجدول!', 'success');
+                    // أعد تحميل المنتجات بعد ثانيتين
+                    setTimeout(() => {
+                        loadProductsFromGoogleSheets();
+                        // أعد تعيين الحقول
+                        document.getElementById('productName').value = '';
+                        document.getElementById('productPrice').value = '';
+                        document.getElementById('productOriginalPrice').value = '';
+                        document.getElementById('productImage').value = '';
+                        document.getElementById('productAdditionalImages').value = '';
+                        document.getElementById('productColors').value = '';
+                        document.getElementById('productSizes').value = '';
+                        document.getElementById('productDescription').value = '';
+                    }, 2000);
+                } else {
+                    showNotification('❌ فشل الإضافة: ' + result.message, 'error');
+                }
+                
+            } catch (error) {
+                console.error('❌ خطأ في الاتصال:', error);
+                showNotification('❌ خطأ في الاتصال: ' + error.message + ' - جرب تبديل Proxy', 'error');
+                rotateProxy(); // تبديل إلى Proxy آخر
+            }
+        }
 
         // ==================== نظام الإدارة ====================
 
@@ -2190,6 +2224,7 @@
             });
             
             const colorFilter = document.getElementById('colorFilter');
+            colorFilter.innerHTML = '<option value="">Toutes les couleurs</option>';
             colors.forEach(color => {
                 const option = document.createElement('option');
                 option.value = color;
@@ -2198,6 +2233,7 @@
             });
             
             const sizeFilter = document.getElementById('sizeFilter');
+            sizeFilter.innerHTML = '<option value="">Toutes les tailles</option>';
             sizes.forEach(size => {
                 const option = document.createElement('option');
                 option.value = size;
@@ -2283,6 +2319,10 @@
         }
 
         // ==================== عرض المنتجات ====================
+
+        function displayProducts() {
+            displayProductsInContainer(filteredProducts, document.getElementById('productsContainer'));
+        }
 
         function displayProductsInContainer(productsArray, container) {
             if (!container) return;
